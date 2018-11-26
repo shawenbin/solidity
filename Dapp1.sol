@@ -1,5 +1,5 @@
 /*
-https://github.com/shawenbin/Dapp1
+https://github.com/shawenbin/solidity/blob/master/Dapp1.sol
 uint of amount is Gwei
 emit 一个 event 记录游戏过程 
 */
