@@ -137,6 +137,7 @@ contract Dapp1 {
         }
     }
     function drawGwei(address payable target, uint56 amount) public payable {
+        stateCheck();
         uint56 fee = 1; // adjuest fee into Gwei
         require(withdrawable[msg.sender] >= amount + fee, "Balance is not enough.");
         withdrawable[msg.sender] -= amount + fee;
