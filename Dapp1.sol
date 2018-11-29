@@ -75,8 +75,7 @@ contract Dapp1 {
         uint16 i = 0;
         for(; i < Teams[teamIndex].Members.length; i++) {
             if(Teams[teamIndex].Members[i].addr == msg.sender) {    // has joined before
-                Teams[teamIndex].Members[i].amount += amount;
-                (Teams[teamIndex].Members[i].message, Teams[teamIndex].Members[i].attackIndex) = (message, attackIndex);
+                (Teams[teamIndex].Members[i].message, Teams[teamIndex].Members[i].attackIndex, Teams[teamIndex].Members[i].amount) = (message, attackIndex, Teams[teamIndex].Members[i].amount+amount);
                 break;
             }
         }
@@ -93,19 +92,22 @@ contract Dapp1 {
     function sumAttack(uint8 index) private {
         uint56 maxAmount = 0;
         uint16 i;
+        uint8 attackIndex;
         if(Teams[index].rule == teamRule.dictatorship) {    // maximum amount is leader
             for(i = 0; i < Teams[index].Members.length; i++) {
                 if(Teams[index].Members[i].amount >= maxAmount)
-                    (maxAmount, Teams[index].attackIndex) = (Teams[index].Members[i].amount, Teams[index].Members[i].attackIndex);
+                    (maxAmount, attackIndex) = (Teams[index].Members[i].amount, Teams[index].Members[i].attackIndex);
             }
+            Teams[index].attackIndex = attackIndex;
         }
         else if(Teams[index].rule == teamRule.democratic) { // subtotal everyone
             uint56[] memory totalAttacks = new uint56[](Teams.length+1);
             for(i = 0; i < Teams[index].Members.length; i++) {
                 totalAttacks[Teams[index].Members[i].attackIndex] += Teams[index].Members[i].amount;
                 if(totalAttacks[Teams[index].Members[i].attackIndex] >= maxAmount)
-                    (Teams[index].attackIndex, maxAmount) = (Teams[index].Members[i].attackIndex, totalAttacks[Teams[index].Members[i].attackIndex]);
+                    (attackIndex, maxAmount) = (Teams[index].Members[i].attackIndex, totalAttacks[Teams[index].Members[i].attackIndex]);
             }
+            Teams[index].attackIndex = attackIndex;
         }
     }
     function stateCheck() public {
@@ -142,5 +144,11 @@ contract Dapp1 {
         else {                  // goto next game
             newGame();
         }
+    }
+    function drawGwei(address payable target, uint56 amount) public payable {
+        uint56 fee = 1; // adjuest fee into Gwei
+        require(withdrawable[msg.sender] >= amount + fee, "Balance is not enough.");
+        withdrawable[msg.sender] -= amount + fee;
+        target.transfer(amount * 1000000000);
     }
 }
