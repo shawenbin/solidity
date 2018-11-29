@@ -18,9 +18,7 @@ contract Dapp1 {
         uint dateNode;          // defint endTime
     }
     struct team {
-        address originator;
         string name;
-        string introduce;
         Country_Region comeFrom;
         teamRule rule;
         uint8[2] lifeCycle; // [first, last] round
@@ -44,26 +42,24 @@ contract Dapp1 {
         config.currertGame ++;
         config.currertRound = 1;
         Teams.length = 0;
-        setupTeam("United Nations Peacekeeping Forces", "Welcome to Join us", Country_Region.UN, teamRule.democratic, 1, 0);
+        setupTeam("United Nations Peacekeeping Forces", Country_Region.UN, teamRule.democratic, 1, 0);
     }
-    function newTeam(string memory name, string memory introduce, Country_Region comeFrom, teamRule rule, uint8 attackIndex, string memory message) public payable {
+    function newTeam(string memory name, Country_Region comeFrom, teamRule rule, uint8 attackIndex, string memory message) public payable {
         stateCheck();
         uint56 amount = uint56(msg.value / 1000000000 - config.teamCharge[1]);
         require(amount > 0, "The amount is not enough to build up a team.");
         require(attackIndex <= Teams.length, "The direction of attack is incorrect.");
         withdrawable[config.developer] += config.teamCharge[1]; // team building cost transfer to developer account
-        setupTeam(name, introduce, comeFrom, rule, attackIndex, amount);
+        setupTeam(name, comeFrom, rule, attackIndex, amount);
         Teams[Teams.length-1].Members.push(member({addr:msg.sender, message:message, amount:amount, attackIndex:attackIndex}));
         if(attackIndex < Teams.length)
             Teams[attackIndex].totalInjury += amount;
         }
-    function setupTeam(string memory name, string memory introduce, Country_Region comeFrom, teamRule rule, uint8 attackIndex, uint56 amount) private {
+    function setupTeam(string memory name, Country_Region comeFrom, teamRule rule, uint8 attackIndex, uint56 amount) private {
         stateCheck();
         Teams.length++;
-        (Teams[Teams.length-1].originator, Teams[Teams.length-1].name, Teams[Teams.length-1].introduce, Teams[Teams.length-1].comeFrom)
-        =(               config.developer,                       name,                       introduce,                       comeFrom);
-        (Teams[Teams.length-1].rule,           Teams[Teams.length-1].lifeCycle, Teams[Teams.length-1].attackIndex, Teams[Teams.length-1].amount)
-        =(                     rule, [config.currertRound,config.currertRound],                       attackIndex,                       amount);
+        (Teams[Teams.length-1].name, Teams[Teams.length-1].comeFrom, Teams[Teams.length-1].rule,           Teams[Teams.length-1].lifeCycle, Teams[Teams.length-1].attackIndex, Teams[Teams.length-1].amount)
+        =(                     name,                       comeFrom,                       rule, [config.currertRound,config.currertRound],                       attackIndex,                       amount);
         config.teamCharge = [config.teamCharge[1], config.teamCharge[0] + config.teamCharge[1]];    // calculate next fibonacci number
     }
     function joinTeam(uint8 teamIndex, uint8 attackIndex, string memory message) public payable {
