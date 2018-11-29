@@ -103,37 +103,38 @@ contract Dapp1 {
     }
     function stateCheck() public {
         if(now >= config.dateNode + 1 days) {
-            uint8 i;
-            uint8 eliminateIndex;   // eliminate Team's index number in teams arrary
-            uint56 maxInjury;       // max injury
-            uint56 denominator;     // total Gwei in this round
-            uint56[] memory injury = new uint56[](Teams.length);
-            for(i = 0; i < Teams.length; i++) {
-                if(Teams[i].lifeCycle[1] == config.currertRound) {
-                    denominator += Teams[i].amount;
-                    if(Teams[Teams[i].attackIndex].lifeCycle[1] == config.currertRound) {
-                        injury[Teams[i].attackIndex] += Teams[i].amount;
-                        if(injury[Teams[i].attackIndex] > maxInjury)
-                            (eliminateIndex, maxInjury) = (Teams[i].attackIndex, injury[Teams[i].attackIndex]);
+            if(Teams.length > 2) {  // goto next round
+                uint8 i;
+                uint8 eliminateIndex;   // eliminate Team's index number in teams arrary
+                uint56 maxInjury;       // max injury
+                uint56 denominator;     // total Gwei in this round
+                uint56[] memory injury = new uint56[](Teams.length);
+                for(i = 0; i < Teams.length; i++) {
+                    if(Teams[i].lifeCycle[1] == config.currertRound) {
+                        denominator += Teams[i].amount;
+                        if(Teams[Teams[i].attackIndex].lifeCycle[1] == config.currertRound) {
+                            injury[Teams[i].attackIndex] += Teams[i].amount;
+                            if(injury[Teams[i].attackIndex] > maxInjury)
+                                (eliminateIndex, maxInjury) = (Teams[i].attackIndex, injury[Teams[i].attackIndex]);
+                        }
                     }
                 }
-            }
-            denominator -= Teams[eliminateIndex].amount;
-            uint56 numerator = Teams[eliminateIndex].amount * 32 / 33;  // 3 percents developer fee
-            withdrawable[config.developer] += Teams[eliminateIndex].amount - numerator;
-            for(i = 0; i < Teams.length; i++) {     // promote
-                if(Teams[i].lifeCycle[1] == config.currertRound && i != eliminateIndex) {
-                    Teams[i].lifeCycle[1]++;
-                    for(uint16 j = 0; j < Teams[i].Members.length; j++)
-                        withdrawable[Teams[i].Members[j].addr] += Teams[i].Members[j].amount * numerator / denominator;
+                denominator -= Teams[eliminateIndex].amount;
+                uint56 numerator = Teams[eliminateIndex].amount * 32 / 33;  // 3 percents developer fee
+                withdrawable[config.developer] += Teams[eliminateIndex].amount - numerator;
+                for(i = 0; i < Teams.length; i++) {     // promote
+                    if(Teams[i].lifeCycle[1] == config.currertRound && i != eliminateIndex) {
+                        Teams[i].lifeCycle[1]++;
+                        for(uint16 j = 0; j < Teams[i].Members.length; j++)
+                            withdrawable[Teams[i].Members[j].addr] += Teams[i].Members[j].amount * numerator / denominator;
+                    }
                 }
+                config.dateNode += 1 days;
+                config.currertRound++;
             }
-            config.dateNode += 1 days;
-        }
-        if(Teams.length > 2)    // goto next round
-            config.currertRound++;
-        else {                  // goto next game
-            newGame();
+            else {                  // goto next game
+                newGame();
+            }
         }
     }
     function drawGwei(address payable target, uint56 amount) public payable {
