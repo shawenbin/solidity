@@ -1,7 +1,6 @@
 /*
 https://github.com/shawenbin/solidity/blob/master/Dapp1.sol
 uint of amount is Gwei
-emit 一个 event 记录游戏过程 
 */
 pragma solidity ^0.5.0;
 contract Dapp1 {
@@ -53,7 +52,6 @@ contract Dapp1 {
         Teams[Teams.length-1].Members.push(member({addr:msg.sender, message:message, amount:amount, attackIndex:attackIndex}));
         }
     function setupTeam(string memory name, Country_Region comeFrom, teamRule rule, uint8 attackIndex, uint56 amount) private {
-        stateCheck();
         Teams.length++;
         (Teams[Teams.length-1].name, Teams[Teams.length-1].comeFrom, Teams[Teams.length-1].rule,           Teams[Teams.length-1].lifeCycle, Teams[Teams.length-1].attackIndex, Teams[Teams.length-1].amount)
         =(                     name,                       comeFrom,                       rule, [config.currertRound,config.currertRound],                       attackIndex,                       amount);
