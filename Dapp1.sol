@@ -24,7 +24,6 @@ contract Dapp1 {
         uint8[2] lifeCycle; // [first, last] round
         uint8 attackIndex;  // team's index in arrary
         uint56 amount;      // max 72,057,594 eth
-        uint56 totalInjury;
         member[] Members;
     }
     struct member {
@@ -52,8 +51,6 @@ contract Dapp1 {
         withdrawable[config.developer] += config.teamCharge[1]; // team building cost transfer to developer account
         setupTeam(name, comeFrom, rule, attackIndex, amount);
         Teams[Teams.length-1].Members.push(member({addr:msg.sender, message:message, amount:amount, attackIndex:attackIndex}));
-        if(attackIndex < Teams.length)
-            Teams[attackIndex].totalInjury += amount;
         }
     function setupTeam(string memory name, Country_Region comeFrom, teamRule rule, uint8 attackIndex, uint56 amount) private {
         stateCheck();
@@ -109,21 +106,22 @@ contract Dapp1 {
     function stateCheck() public {
         if(now >= config.dateNode + 1 days) {
             uint8 i;
-            for(i = 0; i < Teams.length; i++) // clear totalInjury
-                Teams[i].totalInjury = 0;
             uint8 eliminateIndex;   // eliminate Team's index number in teams arrary
             uint56 maxInjury;       // max injury
             uint56 denominator;     // total Gwei in this round
-            for(i = 0; i < Teams.length; i++) {     // re count
-                if(Teams[Teams[i].attackIndex].lifeCycle[1] == config.currertRound) {
-                    Teams[Teams[i].attackIndex].totalInjury += Teams[i].amount;
+            uint56[] memory injury = new uint56[](Teams.length);
+            for(i = 0; i < Teams.length; i++) {
+                if(Teams[i].lifeCycle[1] == config.currertRound) {
                     denominator += Teams[i].amount;
-                    if(Teams[Teams[i].attackIndex].totalInjury > maxInjury)
-                        (eliminateIndex, Teams[Teams[i].attackIndex].totalInjury) = (Teams[i].attackIndex, maxInjury);
+                    if(Teams[Teams[i].attackIndex].lifeCycle[1] == config.currertRound) {
+                        injury[Teams[i].attackIndex] += Teams[i].amount;
+                        if(injury[Teams[i].attackIndex] > maxInjury)
+                            (eliminateIndex, maxInjury) = (Teams[i].attackIndex, injury[Teams[i].attackIndex]);
+                    }
                 }
             }
             denominator -= Teams[eliminateIndex].amount;
-            uint56 numerator = Teams[eliminateIndex].amount * 19 / 20;  // 5 percents developer fee
+            uint56 numerator = Teams[eliminateIndex].amount * 32 / 33;  // 3 percents developer fee
             withdrawable[config.developer] += Teams[eliminateIndex].amount - numerator;
             for(i = 0; i < Teams.length; i++) {     // promote
                 if(Teams[i].lifeCycle[1] == config.currertRound && i != eliminateIndex) {
@@ -132,7 +130,6 @@ contract Dapp1 {
                         withdrawable[Teams[i].Members[j].addr] += Teams[i].Members[j].amount * numerator / denominator;
                 }
             }
-            Teams[Teams[eliminateIndex].attackIndex].totalInjury -= Teams[eliminateIndex].amount;
             config.dateNode += 1 days;
         }
         if(Teams.length > 2)    // goto next round
