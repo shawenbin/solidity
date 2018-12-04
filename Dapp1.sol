@@ -1,4 +1,4 @@
-pragma solidity ^0.5.0;
+pragma solidity ^0.5.1;
 contract Dapp1 {
     enum teamRule { dictatorship, democratic, originator }  // maximum amount, subtotal everyone, who creat team
     enum countryRegion { China, Japan, UN }
@@ -18,7 +18,10 @@ contract Dapp1 {
         teamRule rule;
         uint8[2] lifeCycle; // [first, last] round
         uint8 attackIndex;  // team's index in arrary
-        uint88 amount;      // max 309,485,010 eth
+        uint88 totalAmount; // max 309,485,010 eth
+        uint88 maxMemberAmount;   // max amount member
+        uint88 maxSubAmount;
+        uint88[] subAmount;
         address payable[] members;
     }
     struct memberInfo {
@@ -32,31 +35,40 @@ contract Dapp1 {
         uint88 amount;
     }
     constructor() public {
-        config = gameConfig({developer:msg.sender, currertGame:0, currertRound:1, teamCharge:[uint88(1000000000),2000000000], dateNode:now});
+        config = gameConfig({developer:msg.sender, currertGame:0, currertRound:1, teamCharge:[uint88(1000000000),1000000000], dateNode:now});
         newGame();
     }
     function newGame() private {
-        config.teamCharge = [1000000000,2000000000];
+        // winner is free to next game
+        config.teamCharge = [1000000000,1000000000];
         config.currertGame ++;
         config.currertRound = 1;
         teams.length = 0;
-        setupTeam("United Nations Peacekeeping Forces", countryRegion.UN, teamRule.democratic, 1, 0);   // Automatically build the first team
+        //setupTeam("United Nations Peacekeeping Forces", countryRegion.UN, teamRule.democratic);   // Automatically build the first team
     }
     function newTeam(string memory name, countryRegion comeFrom, teamRule rule, uint8 attackIndex, string memory message) public payable {
         uint88 amount = uint88(msg.value) - config.teamCharge[1];
         require(amount > 0, "The amount is not enough to build up a team.");
         require(attackIndex <= teams.length, "The direction of attack is incorrect.");
-        addr2member[config.developer].balance += config.teamCharge[1]; // team building cost transfer to developer account
-        setupTeam(name, comeFrom, rule, attackIndex, amount);
-        teams[teams.length-1].members.push(msg.sender);
-        addr2member[msg.sender].joins.push(join({teamIndex:uint8(teams.length-1), amount:amount}));
-        }
-    function setupTeam(string memory name, countryRegion comeFrom, teamRule rule, uint8 attackIndex, uint88 amount) private {
+        stateCheck();
+        uint8 teamIndex = uint8(teams.length);
         teams.length++;
-        (teams[teams.length-1].name, teams[teams.length-1].comeFrom, teams[teams.length-1].rule,           teams[teams.length-1].lifeCycle, teams[teams.length-1].attackIndex, teams[teams.length-1].amount)
-        =(                     name,                       comeFrom,                       rule, [config.currertRound,config.currertRound],                       attackIndex,                       amount);
+        (teams[teamIndex].name, teams[teamIndex].comeFrom, teams[teamIndex].rule)=(name, comeFrom, rule);
+        (                teams[teamIndex].lifeCycle, teams[teamIndex].attackIndex, teams[teamIndex].totalAmount)
+        =([config.currertRound,config.currertRound],                  attackIndex,                       amount);
+        teams[teamIndex].members.push(msg.sender);
+        addr2member[msg.sender].joins.push(join({teamIndex:teamIndex, amount:amount}));
+        if(bytes(message).length > 0)
+            addr2member[msg.sender].message = message;
+        if(teams[teamIndex].rule == teamRule.dictatorship)      // maximum amount is leader
+            teams[teamIndex].maxMemberAmount = amount;
+        else if(teams[teamIndex].rule == teamRule.democratic) { // subtotal everyone
+            teams[teamIndex].subAmount = new uint88[](attackIndex+1);
+            (teams[teamIndex].subAmount[attackIndex], teams[teamIndex].maxSubAmount) = (amount, amount);
+            }
+        addr2member[config.developer].balance += config.teamCharge[1];                              // team building cost transfer to developer account
         config.teamCharge = [config.teamCharge[1], config.teamCharge[0] + config.teamCharge[1]];    // calculate next fibonacci number
-    }
+        }
     function joinTeam(uint8 teamIndex, uint8 attackIndex, string memory message) public payable {
         require(msg.value > 0, "Your amount is empty.");
         require(teams[teamIndex].lifeCycle[1] == config.currertRound, "The team is not in currertRound.");
@@ -64,19 +76,31 @@ contract Dapp1 {
         uint88 amount = uint88(msg.value);
         if(bytes(message).length > 0)
             addr2member[msg.sender].message = message;
-        teams[teamIndex].amount += amount;
+        teams[teamIndex].totalAmount += uint88(amount);
         uint8 i = 0;
-        for(; i < addr2member[msg.sender].joins.length; i++) {
-            if(addr2member[msg.sender].joins[i].teamIndex == teamIndex) {   // has joined before
-                addr2member[msg.sender].joins[i].amount += amount;
-                break;
+        if(addr2member[msg.sender].joins.length > 0) {
+            for(; i < addr2member[msg.sender].joins.length; i++) {
+                if(addr2member[msg.sender].joins[i].teamIndex == teamIndex) {   // has joined before
+                    addr2member[msg.sender].joins[i].amount += amount;
+                    break;
+                }
             }
         }
-        if(i == addr2member[msg.sender].joins.length) {                     // first time to join
+        else if(i == addr2member[msg.sender].joins.length) {                     // first time to join
             teams[teamIndex].members.push(msg.sender);
             addr2member[msg.sender].joins.push(join({teamIndex:teamIndex, amount:amount}));
         }
-        attackTeam(attackIndex);
+        if(addr2member[msg.sender].attackIndex == attackIndex) {
+            if(teams[teamIndex].rule == teamRule.democratic) {  // subtotal everyone
+                teams[teamIndex].subAmount[attackIndex] += amount;
+                if(teams[teamIndex].subAmount[attackIndex] >= teams[teamIndex].maxSubAmount)
+                    (teams[teamIndex].maxSubAmount, teams[teamIndex].attackIndex) = (teams[teamIndex].subAmount[attackIndex], attackIndex);
+            }
+            else if(teams[teamIndex].rule == teamRule.dictatorship && addr2member[msg.sender].joins[i].amount >= teams[teamIndex].maxMemberAmount)  // maximum amount is leader
+                (teams[teamIndex].maxMemberAmount, teams[teamIndex].attackIndex) = (addr2member[msg.sender].joins[i].amount, attackIndex);
+        }
+        else
+            attackTeam(attackIndex);
     }
     function attackTeam(uint8 attackIndex) public {
         for(uint8 i = 0; i < addr2member[msg.sender].joins.length; i++)
@@ -127,22 +151,22 @@ contract Dapp1 {
                 uint88[] memory injury = new uint88[](teams.length);
                 for(i = 0; i < teams.length; i++) {
                     if(teams[i].lifeCycle[1] == config.currertRound) {
-                        denominator += teams[i].amount;
+                        denominator += teams[i].totalAmount;
                         if(teams[teams[i].attackIndex].lifeCycle[1] == config.currertRound) {
-                            injury[teams[i].attackIndex] += teams[i].amount;
+                            injury[teams[i].attackIndex] += teams[i].totalAmount;
                             if(injury[teams[i].attackIndex] > maxInjury)
                                 (eliminateIndex, maxInjury) = (teams[i].attackIndex, injury[teams[i].attackIndex]);
                         }
                     }
                 }
-                denominator -= teams[eliminateIndex].amount;
-                uint88 numerator = teams[eliminateIndex].amount * 32 / 33;  // 3 percents developer fee
-                addr2member[config.developer].balance += teams[eliminateIndex].amount - numerator;
+                denominator -= teams[eliminateIndex].totalAmount;
+                uint88 numerator = teams[eliminateIndex].totalAmount * 32 / 33;  // 3 percents developer fee
+                addr2member[config.developer].balance += teams[eliminateIndex].totalAmount - numerator;
                 for(i = 0; i < teams.length; i++) {     // promote
                     if(teams[i].lifeCycle[1] == config.currertRound && i != eliminateIndex) {
                         teams[i].lifeCycle[1]++;
                         for(uint16 j = 0; j < teams[i].members.length; j++)
-                            addr2member[teams[i].members[j]].balance += 1 * numerator / denominator;
+                            addr2member[teams[i].members[j]].balance += teams[i].members[j].amount * numerator / denominator;
                     }
                 }
                 config.dateNode += 1 days;
@@ -153,10 +177,10 @@ contract Dapp1 {
             }
         }
     }
-    function drawGwei(address payable target, uint88 amount) public payable {
+    function drawGwei(address payable target, uint56 amount) public payable {
         require(addr2member[msg.sender].balance >= amount , "Balance is not enough.");
         stateCheck();
         addr2member[msg.sender].balance -= amount;
-        target.transfer(amount);
+        target.transfer(amount * 1000000000);
     }
 }
