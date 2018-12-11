@@ -103,43 +103,23 @@ contract Dapp1 {
             attackTeam(attackIndex);
     }
     function attackTeam(uint8 attackIndex) public {
-        for(uint8 i = 0; i < addr2member[msg.sender].joins.length; i++)
-            sumAttack(addr2member[msg.sender].joins[i].teamIndex);
-        if(addr2member[msg.sender].attackIndex != attackIndex)
-            addr2member[msg.sender].attackIndex = attackIndex;
-    }
-    function sumAttack(uint8 index) private {
-        uint88 maxAmount = 0;
-        uint8 attackIndex;
-        if(teams[index].rule == teamRule.dictatorship) {    // maximum amount is leader
-            for(uint32 i = 0; i < teams[index].members.length; i++) {
-                for(uint8 j = 0; j < addr2member[teams[index].members[i]].joins.length; j++) {
-                    if(addr2member[teams[index].members[i]].joins[j].teamIndex == index) {
-                        if(addr2member[teams[index].members[i]].joins[j].amount >= maxAmount)
-                            (maxAmount, attackIndex) = (addr2member[teams[index].members[i]].joins[j].amount, addr2member[teams[index].members[i]].attackIndex);
-                        break;
-                    }
-                }
+        for(uint8 i = 0; i < addr2member[msg.sender].joins.length; i++) {
+            uint8 teamIndex = addr2member[msg.sender].joins[i].teamIndex;
+            if(teams[teamIndex].rule == teamRule.democratic) {  // subtotal everyone
+                teams[teamIndex].subAmount[addr2member[msg.sender].attackIndex] -= addr2member[msg.sender].joins[i].amount;
+                teams[teamIndex].subAmount[attackIndex] += addr2member[msg.sender].joins[i].amount;
+                if(teams[teamIndex].subAmount[attackIndex] >= teams[teamIndex].maxSubAmount)
+                    (teams[teamIndex].maxSubAmount, teams[teamIndex].attackIndex) = (teams[teamIndex].subAmount[attackIndex], attackIndex);
+                else if(teams[teamIndex].attackIndex == addr2member[msg.sender].attackIndex)
+                    teams[teamIndex].attackIndex = seekMax(teams[teamIndex].subAmount);
             }
-            teams[index].attackIndex = attackIndex;
+            else if(teams[addr2member[msg.sender].joins[i].teamIndex].rule == teamRule.dictatorship && addr2member[msg.sender].joins[i].amount >= teams[teamIndex].maxMemberAmount)  // maximum amount is leader
+                (teams[teamIndex].maxMemberAmount, teams[teamIndex].attackIndex) = (addr2member[msg.sender].joins[i].amount, attackIndex);
+            
+            
+            
         }
-        else if(teams[index].rule == teamRule.democratic) { // subtotal everyone
-            uint88[] memory totalAttacks = new uint88[](teams.length+1);
-            for(uint32 i = 0; i < teams[index].members.length; i++) {
-                for(uint8 j = 0; j < addr2member[teams[index].members[i]].joins.length; j++) {
-                    if(addr2member[teams[index].members[i]].joins[j].teamIndex == index) {
-                        totalAttacks[addr2member[teams[index].members[i]].attackIndex] += addr2member[teams[index].members[i]].joins[j].amount;
-                        if(totalAttacks[addr2member[teams[index].members[i]].attackIndex] > maxAmount)
-                            (maxAmount, attackIndex) = (totalAttacks[addr2member[teams[index].members[i]].attackIndex], addr2member[teams[index].members[i]].attackIndex);
-                        break;
-                    }
-                }
-            }
-            teams[index].attackIndex = attackIndex;
-        }
-        else if(teams[index].rule == teamRule.originator) { // the first member is leader
-        
-        }
+        addr2member[msg.sender].attackIndex = attackIndex;
     }
     function stateCheck() public {
         if(now >= config.dateNode + 1 days) {
